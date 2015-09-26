@@ -55,6 +55,24 @@
 ;; how am I gonna typecheck this?
 ;; bidirectionally. with subtyping for cases.
 
+;; WHAT DO I NEED TO INFER ANYWAY?
+;; - which channels we use
+;;   easy enough in theory.
+;;
+;; - what the type of the channel we own is.
+;;
+;; WHAT DO I NEED TO CHECK?
+;; - that we always terminate by closing our own channel
+;;
+;; - that we wait on all channels we use and haven't given away
+;;
+;; - that we don't give away channels multiply, or use channels after giving
+;;   them away
+;;
+;; - that (close) & (case ...) appear only in terminal position
+;;
+;; - that we don't use free variables
+
 
 ;;; ---------- TYPE OPERATIONS & TYPE CHECKING ----------
 ;;;
@@ -106,6 +124,10 @@
     [(_ `(one of . ,as)) (err)]
     ;; has to go last b/c it has no keywords
     [((cons a as) (cons b bs)) (cons (type-lub a b) (type-lub as bs))]))
+
+;; infers the type of a program in a context
+(define (synth G c x)
+  )
 
 
 ;; ---------- STATE STRUCTURES ----------
