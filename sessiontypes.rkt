@@ -28,7 +28,7 @@
 ;;          -- & ("with") and ⊕ ("oplus") rules.
 ;;          (C <- tag N)            -- sends tag N to C
 ;;          -- receives a tag on C then dispatches to the matching case
-;;          (case C (if N then . P) ...)
+;;          (case C (N => . P) ...)
 ;;
 ;;          -- unit rules
 ;;          (wait C)                -- waits on another channel to close
@@ -43,8 +43,8 @@
 ;;          (recv A . B)                   -- lolli,  -o
 ;;          (send value . A)               -- tensor, ⊗  (but for racket values)
 ;;          (recv value . A)               -- lolli,  -o (but for racket values)
-;;          (recv one of (N . A) ...)      -- with, &
-;;          (send one of (N . A) ...)      -- sum,  ⊕
+;;          (recv one of (N => . A) ...)   -- with, &
+;;          (send one of (N => . A) ...)   -- sum,  ⊕
 ;;           -- NB. in with and sum, all tags must be distinct.
 ;;          ()                             -- unit, 1, meaning "done"
 ;;
@@ -97,16 +97,15 @@
 (define (type-lub-rest send-or-recv a b)
   (define (err) (type-error-lub (cons send-or-recv a) (cons send-or-recv b)))
   (match* (a b)
-    [(`(one of . ,as) `(one of . ,bs)) ;; the interesting case
-      ;; sorry, this is pretty inscrutable
-      (define a-map (make-immutable-hash as))
-      (define b-map (make-immutable-hash bs))
-      ;; ⊕(x: A) ≤ ⊕(x: A, y: B)
-      ;; &(x: A, y: B) ≤ &(x: A)
+    ;; the interesting case - sorry, this is pretty inscrutable
+    [(`(one of (,akeys => ,avals) ...) `(one of (,bkeys => ,bvals) ...))
+      (define a-map (for/hash ([k akeys] [v avals]) (values k v)))
+      (define b-map (for/hash ([k bkeys] [v bvals]) (values k v)))
       (define keys
+        ;; ⊕(x: A) ≤ ⊕(x: A, y: B)
+        ;; &(x: A, y: B) ≤ &(x: A)
         ((match send-or-recv ['send set-union] ['recv set-intersect])
-          (list->set (map car as))
-          (list->set (map car bs))))
+          (list->set akeys) (list->set bkeys)))
       `(one of
          ,@(for/list ([k keys])
              (cons k
@@ -123,11 +122,14 @@
     [(`(one of . ,as) _) (err)]
     [(_ `(one of . ,as)) (err)]
     ;; has to go last b/c it has no keywords
-    [((cons a as) (cons b bs)) (cons (type-lub a b) (type-lub as bs))]))
+    [((cons a as) (cons b bs))
+      ;; check for inappropriate keywords. TODO: better error message here.
+      (when (or (member a '(one value)) (member b '(one value))) (err))
+      (cons (type-lub a b) (type-lub as bs))]))
 
 ;; infers the type of a program in a context
-(define (synth G c x)
-  )
+;; (define (synth G c x)
+;;   )
 
 
 ;; ---------- STATE STRUCTURES ----------
