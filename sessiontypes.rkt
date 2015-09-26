@@ -74,7 +74,7 @@
 ;; - that we don't use free variables
 
 
-;;; ---------- TYPE OPERATIONS & TYPE CHECKING ----------
+;;; ---------- TYPE CHECKING ----------
 ;;;
 ;;; You can skip reading this unless you care about type inference details.
 
@@ -85,8 +85,9 @@
 ;;  "type error: could not unify FOO with FOO"
 (define (type-ok x) (type-lub x x))
 
-;; least upper bound under subtyping. "unions" or "unifies" two types to find
-;; the smallest one that includes both.
+;; type-lub "unions" or "unifies" two types to find the most specific type that
+;; subsumes both; errors if no such type exists. technically, finds their least
+;; upper bound under the subtyping partial order.
 (define (type-lub a b)
   (match* (a b)
     [('() '()) '()]
@@ -98,7 +99,7 @@
   (define (err) (type-error-lub (cons send-or-recv a) (cons send-or-recv b)))
   (match* (a b)
     ;; the interesting case - sorry, this is pretty inscrutable
-    [(`(one of (,akeys => ,avals) ...) `(one of (,bkeys => ,bvals) ...))
+    [(`(one of (,akeys => . ,avals) ...) `(one of (,bkeys => . ,bvals) ...))
       (define a-map (for/hash ([k akeys] [v avals]) (values k v)))
       (define b-map (for/hash ([k bkeys] [v bvals]) (values k v)))
       (define keys
@@ -108,13 +109,13 @@
           (list->set akeys) (list->set bkeys)))
       `(one of
          ,@(for/list ([k keys])
-             (cons k
+             `(,k =>
                ;; if A ≤ B then ⊕(x: A) ≤ ⊕(x: B)
                ;; if A ≤ B then &(x: A) ≤ &(x: B)
-               (match* ((hash-ref a-map k #f) (hash-ref b-map k #f))
-                 [(#f x) (type-ok x)]
-                 [(x #f) (type-ok x)]
-                 [(x y) (type-lub x y)]))))]
+               ,@(match* ((hash-ref a-map k #f) (hash-ref b-map k #f))
+                   [(#f x) (type-ok x)]
+                   [(x #f) (type-ok x)]
+                   [(x y) (type-lub x y)]))))]
     [(`(value . ,as) `(value . ,bs)) `(value . ,(type-lub as bs))]
     ;; error cases
     [(`(value . ,_) _) (err)]
